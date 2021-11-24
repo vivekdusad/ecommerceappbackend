@@ -9,4 +9,7 @@ exports.connect =()=>{
     }).catch(()=>{
         console.log("databse connection failed");
     });
+    mongoose.connection.on('connected',()=>{
+        console.log("MongoDb Connected");
+    })
 }

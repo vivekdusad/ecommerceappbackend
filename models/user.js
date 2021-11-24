@@ -46,8 +46,10 @@ const userSchema = Schema({
 });
 
 userSchema.pre('save', function (next) {
+    console.log("saving");
     if (!this.isModified('password')) return next();
     this.password = bycrypt.hash(this.password, 10);
+    next();
 });
 //validate the password with the userpassword
 userSchema.methods.isPasswordValidated = async function (userpassword) {
@@ -68,4 +70,4 @@ userSchema.methods.getForgotPasswordToken = function () {
 }
 
 
-exports.User = mongoose.model('User', userSchema);
+module.exports = mongoose.model('User', userSchema);
