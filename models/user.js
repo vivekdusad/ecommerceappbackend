@@ -45,10 +45,13 @@ const userSchema = Schema({
     }
 });
 
-userSchema.pre('save', function (next) {
-    console.log("saving");
-    if (!this.isModified('password')) return next();
-    this.password = bycrypt.hash(this.password, 10);
+userSchema.pre('save',async function (next) {
+    if (!this.isModified('password')){
+        console.log("printing");
+        return next();
+    }
+    this.password = await bycrypt.hash(this.password, 10);
+    console.log(this.password);
     next();
 });
 //validate the password with the userpassword
