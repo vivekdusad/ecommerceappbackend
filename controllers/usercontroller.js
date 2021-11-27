@@ -1,6 +1,7 @@
 const BigPromise = require("../middlewares/bigpromise");
 const User = require("../models/user");
 const { cookieToken } = require("../utils/cookietoken");
+const crypto = require('crypto');
 const sendmail = require("../utils/mailhelper");
 exports.signup = BigPromise(async (req, res, next) => {
   const { name, email, password } = req.body;
@@ -36,27 +37,54 @@ exports.login = BigPromise(async (req, res, next) => {
 exports.forgotpassword = BigPromise(async (req, res, next) => {
   const { email } = req.body;
   if (!email) {
-    res.status(400).send("email is required");
+    return res.status(400).send("email is required");
   }
   const user = await User.findOne({ email }).select("+password");
   if (!user) {
-    res.status(404).send("email is not found");
+    return res.status(404).send("email is not found");
   }
   const forgotPasswordToken = await user.getForgotPasswordToken();
-  const resetPasswordUrl = `${res.protocol}://${res.get(
+  await user.save({ validateBeforeSave: false });
+  const resetPasswordUrl = `${req.protocol}://${req.get(
     "host"
-  )}/reset/password/${forgotPasswordToken}`;
+  )}/api/v1/password/reset/${forgotPasswordToken}`;
   try {
-    //!send email here
     const options = {
       email: email,
       subject: "Password Verification",
       text: resetPasswordUrl,
     };
     await sendmail(options);
+    return res.status(200).send("Email Sent Succesfully");
   } catch {
     user.forgotPasswordToken = undefined;
     user.forgotPasswordExpiry = undefined;
-    res.status(500).send("Error Occured");
+    await user.save({ validateBeforeSave: false });
+    return res.status(501).send(Error("Error Occured"));
   }
+});
+exports.resetpassword = BigPromise(async (req, res, next) => {
+  const {token}  = req.params;
+  if (!token) {
+    return res.status(400).send("token is required");
+  }
+  const encrtToken = crypto.createHash("sha256").digest("hex");
+  const user = await User.findOne({
+    encrtToken,
+    forgotPasswordExpiry:{$gt:Date.now()}
+  });
+  if (!user) {
+    return res.status(404).send("token is invalid or expired");
+  }
+  const password = req.body.password;
+  const confirmpassword = req.body.confirmpassword;
+  if(password != confirmpassword){
+    return res.send(400).send("Password Does Not Match");
+  }
+  user.password = password;
+  user.forgotPasswordExpiry=undefined;
+  user.forgotPasswordToken=undefined;
+  await user.save();
+  await cookieToken(user,res);
+  next();
 });
