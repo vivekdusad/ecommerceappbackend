@@ -107,35 +107,69 @@ exports.changePassword = BigPromise(async (req, res, next) => {
   const id = req.user.id;
   const user = await User.findById(id).select("+password");
   console.log(user);
-  const oldpassword=req.body.oldpassword;
+  const oldpassword = req.body.oldpassword;
   const isPasswordCorrect = await user.isPasswordValidated(oldpassword);
   if (!isPasswordCorrect) {
     //if password is wrong
-   return res.send(Error("password does not match"));
+    return res.send(Error("password does not match"));
   }
-  user.password=req.body.password;
+  user.password = req.body.password;
   await user.save();
-  return cookieToken(user,res);
+  return cookieToken(user, res);
 });
 
 exports.userdashboardUpdate = BigPromise(async (req, res, next) => {
-  const email=req.body.email;
-  const name=req.body.name;
-  if(!email|| !name){
+  const email = req.body.email;
+  const name = req.body.name;
+  if (!email || !name) {
     return res.send(Error("name and password required"));
   }
   const id = req.user.id;
   const user = await User.findById(id);
   console.log(user);
-  const newUser={
-    name:name,
-    email:email
-  }
-  await User.findByIdAndUpdate(id,newUser,{
-    new:true,
-    runValidators:true
+  const newUser = {
+    name: name,
+    email: email,
+  };
+  await User.findByIdAndUpdate(id, newUser, {
+    new: true,
+    runValidators: true,
   });
   return res.json({
-    success:true
-  })
+    success: true,
+  });
+});
+
+//admin all endpoints
+exports.adminAllUsers = BigPromise(async (req, res, next) => {
+  const users = await User.find({});
+  res.send({
+    success: true,
+    users,
+  });
+});
+
+exports.adminOneUser = BigPromise(async (req, res, next) => {
+  const id = req.params.id;
+  if (!id) {
+    res.send(Error("Please Send Id"));
+  }
+  const users = await User.findById(id);
+  if (!users) {
+    res.send(Error("No User Exist"));
+  }
+  res.send({
+    success: true,
+    users,
+  });
+});
+
+
+//manger Apis
+exports.managerAllUsers = BigPromise(async (req, res, next) => {
+  const users = await User.find({ role: "user" });
+  res.send({
+    success: true,
+    users,
+  });
 });
