@@ -1,8 +1,9 @@
 const BigPromise = require("../middlewares/bigpromise");
 const User = require("../models/user");
 const { cookieToken } = require("../utils/cookietoken");
-const crypto = require('crypto');
+const crypto = require("crypto");
 const sendmail = require("../utils/mailhelper");
+
 exports.signup = BigPromise(async (req, res, next) => {
   const { name, email, password } = req.body;
   if (!(email && password && name)) {
@@ -17,6 +18,7 @@ exports.signup = BigPromise(async (req, res, next) => {
   await cookieToken(user, res);
   next();
 });
+
 exports.login = BigPromise(async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -34,6 +36,7 @@ exports.login = BigPromise(async (req, res, next) => {
   await cookieToken(user, res);
   next();
 });
+
 exports.forgotpassword = BigPromise(async (req, res, next) => {
   const { email } = req.body;
   if (!email) {
@@ -63,28 +66,76 @@ exports.forgotpassword = BigPromise(async (req, res, next) => {
     return res.status(501).send(Error("Error Occured"));
   }
 });
+
 exports.resetpassword = BigPromise(async (req, res, next) => {
-  const {token}  = req.params;
+  const { token } = req.params;
   if (!token) {
     return res.status(400).send("token is required");
   }
   const encrtToken = crypto.createHash("sha256").digest("hex");
   const user = await User.findOne({
     encrtToken,
-    forgotPasswordExpiry:{$gt:Date.now()}
+    forgotPasswordExpiry: { $gt: Date.now() },
   });
   if (!user) {
     return res.status(404).send("token is invalid or expired");
   }
   const password = req.body.password;
   const confirmpassword = req.body.confirmpassword;
-  if(password != confirmpassword){
+  if (password != confirmpassword) {
     return res.send(400).send("Password Does Not Match");
   }
   user.password = password;
-  user.forgotPasswordExpiry=undefined;
-  user.forgotPasswordToken=undefined;
+  user.forgotPasswordExpiry = undefined;
+  user.forgotPasswordToken = undefined;
   await user.save();
-  await cookieToken(user,res);
+  await cookieToken(user, res);
   next();
+});
+
+exports.loggedInUserDashboard = BigPromise(async (req, res, next) => {
+  const id = req.user.id;
+
+  const user = await User.findById(id);
+  return res.send({
+    success: true,
+    user,
+  });
+});
+
+exports.changePassword = BigPromise(async (req, res, next) => {
+  const id = req.user.id;
+  const user = await User.findById(id).select("+password");
+  console.log(user);
+  const oldpassword=req.body.oldpassword;
+  const isPasswordCorrect = await user.isPasswordValidated(oldpassword);
+  if (!isPasswordCorrect) {
+    //if password is wrong
+   return res.send(Error("password does not match"));
+  }
+  user.password=req.body.password;
+  await user.save();
+  return cookieToken(user,res);
+});
+
+exports.userdashboardUpdate = BigPromise(async (req, res, next) => {
+  const email=req.body.email;
+  const name=req.body.name;
+  if(!email|| !name){
+    return res.send(Error("name and password required"));
+  }
+  const id = req.user.id;
+  const user = await User.findById(id);
+  console.log(user);
+  const newUser={
+    name:name,
+    email:email
+  }
+  await User.findByIdAndUpdate(id,newUser,{
+    new:true,
+    runValidators:true
+  });
+  return res.json({
+    success:true
+  })
 });
